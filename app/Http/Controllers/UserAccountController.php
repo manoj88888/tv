@@ -164,7 +164,8 @@ class UserAccountController extends Controller
         $account_no = $config->account_no;
         $ifsc_code = $config->ifsc_code;
         $bank = $config->bank_name;
-
+        $intent = '';
+        $kingspayintent = '';
         if(env('STRIPE_SECRET') != NULL && env('STRIPE_KEY') != NULL && $stripe_payment == 1){
             $paymentMethods = $request->user()->paymentMethods();
 
@@ -178,7 +179,8 @@ class UserAccountController extends Controller
         }
 
         //Session::forget('coupon_applied');     
-        
+       /* echo "string";
+        exit();*/
 
         return view('subscribe', compact('plan', 'bankdetails', 'account_no', 'account_name', 'ifsc_code', 'bank','razorpay_payment','intent', 'kingspayintent', 'instamojo_payment','mollie_payment','cashfree_payment', 'kingspay_payment'));
     }

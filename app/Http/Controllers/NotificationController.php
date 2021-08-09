@@ -225,4 +225,15 @@ class NotificationController extends Controller
 
     }
 
+    public function FirebaseNofication($user_id,$title='',$desc="",$movie_id="",$tvid="",$radio_id="")
+    {
+        $serviceAccount = ServiceAccount::fromJsonFile(__DIR__.'/alphatv-584b0-firebase-adminsdk-800v9-bf8c62c7c9.json');
+
+        $firebase         = (new Factory)->withServiceAccount($serviceAccount)->withDatabaseUri('https://alphatv-584b0-default-rtdb.firebaseio.com')->create();
+
+        $database       = $firebase->getDatabase();
+
+        $newPost          = $database->getReference('messages/'.$user_id.'/')->push(['title'=> $title,'desc'=> $desc, 'movie_id' => $movie_id, 'tvid' => $tvid,'radio_id'=>$radio_id,'read' => 0]);
+    }
+
 }

@@ -11,10 +11,6 @@
     <div class="container-fluid">
         <h3 class="payment-title">{{__('staticwords.paymentinformation')}}</h3>
         <br/>
-        <div class="col-md-12">
-            <p class="errors_message">
-            </p>
-        </div>
         <div class="row panel-setting-main-block">
             <div class="col-md-6 col-sm-6 package_information ">
                 <div class="panel-default">
@@ -37,7 +33,7 @@
                             <tr>
                                 <th>{{__('Total Amount')}}</th>
                                 <td><i class="{{ $plan->currency_symbol }}"></i> {{$plan->amount - Session::get('coupon_applied')['amount'] }} /  {{$plan->interval}}</td>
-                                <input type="hidden" value="{{$plan->amount - Session::get('coupon_applied')['amount'] }}" class="final_pay">
+                                <input type="hidden" value="{{$plan->amount - Session::get('coupon_applied')['amount'] }}" id="final_pay">
                             </tr>
                             @endif
                             @if(!Session::has('coupon_applied'))
@@ -46,7 +42,6 @@
                                 <td><i class="{{$plan->currency_symbol}}"></i> {{number_format(($plan->amount) / ($plan->interval_count),2)}}/
                                     {{$plan->interval}}
                                 </td>
-                                <input type="hidden" value="{{$plan->amount}}" class="final_pay">
                             </tr>
                             @endif
                         </table>
@@ -565,25 +560,17 @@
         </div>
     </div>
 </section>
-@if(env('PAYPAL_MODE') == 'LIVE')
-<script src="https://www.paypal.com/sdk/js?client-id=ASMHMeysgLdPBqJZFQ4i3qeo_QJejtbmiQzoioG4DI0Gj_NDyN1A2qIbeFdMfRf24sWullkwmrooSU8_&vault=true" data-namespace="paypal_sdk"></script>
-@else
-<script src="https://www.paypal.com/sdk/js?client-id=AabeLs7PtctOGhZQio3e11eqwKaKSfB6jDRrvtoXWE8-Lk0TvXY9pGabDcEBEbH4K7MySnANewStN8Q7&vault=true" data-namespace="paypal_sdk"></script>
-@endif
 @endsection
 @section('custom-script')
+<script src="https://www.paypal.com/sdk/js?client-id=AabeLs7PtctOGhZQio3e11eqwKaKSfB6jDRrvtoXWE8-Lk0TvXY9pGabDcEBEbH4K7MySnANewStN8Q7" data-namespace="paypal_sdk"></script>
 <script>
-var pay = $(document).find('.final_pay').val();
-var UserID = "{{ Auth::user()->id }}";
-var PlanID = "{{ $plan->id }}";
-var route = "{{ route('home','home') }}";
-
+var pay = $(document).find('#final_pay').val();
     paypal_sdk.Buttons({
     createOrder : function(data, actions){
       return actions.order.create({
         purchase_units : [{
           amount : {
-            value : pay
+            value : 10
           }
         }],
         application_context: {
@@ -600,77 +587,29 @@ var route = "{{ route('home','home') }}";
            branding: true
     
       },
-    onApprove: function (data, actions) {
-        console.log(data.handledErrors);
-        console.log('fff');
-        console.log(data.actions);
-
-        /*console.log(data.status);*/
-         
-        // 2. Make a request to server
-         var actionssucess =  actions.order.capture().then(function(details) {
-                
-                if(details.status == 'COMPLETED')
-                {
-                        $.ajax({
-                          headers: {
-                              "X-CSRF-TOKEN": $('meta[name="csrf-token"]').attr("content")
-                          },
-                          type: "POST",
-                          data : {'paypal_details':details,'UserID':UserID,'PlanID': PlanID},
-                          url: "{{ route('AjaxgetPaymentStatus') }}",
-                          success: function(res) {   
-                              /*console.log(res);*/
-                              if(res.success == true)
-                              {
-                                 $(".errors_message").empty();
-                                 $(".errors_message").prepend(messages('alert-info', res.message));
-                                    window.location.href = route;
-                                /*setTimeout(function() {
-                                }, 5000);*/
-
-                              }
-                              else
-                              {
-                                 $(".errors_message").empty();
-                                 $(".errors_message").prepend(messages('alert-danger', res.message));
-                                 setTimeout(function() {
-                                    window.location.href = route;
-                                }, 5000);                               
-                              }
-
-                              return false;
-                          },
-                        });
-                }
-         });           
-       
-     },
-    onCancel: function (data, actions) { 
-     $(".errors_message").empty(); 
-         $(".errors_message").prepend(messages('alert-danger', 'Payment is cancelled'));
-         setTimeout(function() 
-         {
-            location.reload();
-        }, 2000);               
-          
-    },
-
-     onError: function (err) {
-            $(".errors_message").empty(); 
-            $(".errors_message").prepend(messages('alert-danger', 'Payment error'));
-            setTimeout(function() 
-            {
-                location.reload();
-            }, 2000);                   
-    }
+    
+      onAuthorize: function(data, actions) {
+        // Capture the funds from the transaction
+        return actions.order.capture().then(function(details) {
+    
+          return fetch('/pay-with-pp', {
+            method: 'post',
+            headers: {
+              'content-type': 'application/json'
+            },
+            body: JSON.stringify({
+              orderID: data.orderID,
+              product_id : product_id,
+              _token : token
+            })
+          }).then(function(res){
+            alert('Payment has been made! Please see the delivery status on orders page!');
+            window.location.href = redirect_url
+          });
+        });
+      },
     
     }).render('#paypal-button-container');
-
-     function messages(classname, msg)
-    {
-        return '<div class="alert ' + classname + '">' + msg + '<button type="button" class="close" data-dismiss="alert" aria-hidden="true">×</button></div>';
-    }
 </script>
 <script type="text/javascript" src="https://js.stripe.com/v2/"></script>
 <script src="https://js.stripe.com/v3/"></script>

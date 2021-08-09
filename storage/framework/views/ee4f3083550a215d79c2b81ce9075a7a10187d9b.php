@@ -392,7 +392,7 @@ $custom_page = App\CustomPage::where('in_show_menu','1')->where('is_active','1')
                 <ul class="dropdown-menu prime-dropdown-menu ">
                     <div class="notificationmsg"></div>
                  
-                    <button class="btn btn-primary read-all" style="float: right;">Read All</button>
+                    <button class="btn btn-primary hide read-all" style="float: right;">Mark as Read</button>
                 </ul>
               </div> 
             </li>
@@ -1171,13 +1171,13 @@ $(function() {
     $('#back2Top').fadeOut();
   }
 });
- $(document).on('click','.read-all',function() {
+/* $(document).on('click','.read-all',function() {
  var notification = $("input[class='read_notification']")
               .map(function(){return $(this).val();}).get();
  //var notification = $('input[name="read_notification[]"]').serialize();
  console.log(notification);
   readedAll(notification);
-});
+});*/
  $(document).ready(function() {
   
   
@@ -1231,14 +1231,14 @@ $(document).ready(function() {
 
  function readedAll(notification){
   /*alert(notification);*/
-   $.ajax({
+   /*$.ajax({
     type : 'POST',
     data : {  "_token": "<?php echo e(csrf_token()); ?>",id:notification },
     url  : "<?php echo e(route('notificationreadAll')); ?>",
     success :function(data){
       location.reload();
     }
-  });
+  });*/
  }
 
  
@@ -1294,6 +1294,7 @@ $(document).ready(function() {
 
 <script src="https://www.gstatic.com/firebasejs/5.9.4/firebase-database.js"></script>
 <script>
+  var  loginuser = '';
   $(document).ready(function() { 
   // Initialize Firebase
   /*var firbaseconfig = {
@@ -1316,7 +1317,6 @@ $(document).ready(function() {
   };
   firebase.initializeApp(firbaseconfig);
   var loginuser =  "<?php echo e((auth()->check()) ? Auth::user()->id : ''); ?>";
-  console.log(loginuser);
   var db_ref = firebase.database().ref('messages');
 
     /*db_ref.on('value', function(snapshot) {
@@ -1334,15 +1334,53 @@ if(loginuser)
   /*db_ref.child(loginuser).on("value", function(snapshot) {
       var messageCount = snapshot.numChildren();
   });*/
+  db_ref.child(loginuser).on("value", function(ysnapshot) {
+    var count = ysnapshot.numChildren();
+    if(count > 0)
+    {
+
+      $(document).find('.read-all').removeClass('hide');
+      $(document).find('.read-all').addClass('show');
+    }
+    else
+    {
+
+      $(document).find('.read-all').removeClass('show');
+      $(document).find('.read-all').addClass('hide');
+    }
+    
+  });
   db_ref.child(loginuser).orderByChild("read").equalTo(0).on("value", function(ysnapshot) {
     var unread = ysnapshot.numChildren();
       $(document).find('.count-firebasemessage').attr('data-count',unread);
-});
+  });
   db_ref.child(loginuser).on('child_added', function (data) {
     $(document).find('.notificationmsg').prepend('<li> <div id="notification_id" class="card"> <p><b>'+data.val().title+'</b></p> <p> '+ data.val().desc +'</p> </div> <hr> </li>');
   });
-}
+  
+    /*query.once('value', function (snapshot) {
+        snapshot.forEach(function (childSnapshot) {
+            var childKey = childSnapshot.key;
+            var childData = childSnapshot.val();
+            childSnapshot.set({'read':1});
+            // ...
+        });
+    });*/
+   $(document).on('click','.read-all',function() {
+    
+        const query = db_ref.child(loginuser).orderByChild('read')
+            .equalTo(0)
+            .once('value', function (snapshot) {
+              snapshot.forEach(function(child) {
+                child.ref.update({read: 1});
+              });
+        });
+   
+    
   });
+}
+
+});
 </script>
 <!----- end facebook --------->
 

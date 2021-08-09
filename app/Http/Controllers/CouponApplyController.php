@@ -56,6 +56,10 @@ class CouponApplyController extends Controller
 	          	$amount = ($plan->amount * $coupon->percent_off)/100;
 	          }
 	          
+	          if($amount >= $plan->amount)
+	          {
+	          	return back()->with('deleted','Coupon Expired !');
+	          }
 	          
 	        
 	          if($amount == $plan->amount && $coupon->day_for_free != 0){

@@ -237,6 +237,7 @@ Route::middleware(['IsInstalled','isActive' ,'switch_languages', 'ip_block','com
       Route::post('emailsubscribe', 'emailSubscribe@subscribe');
       Route::post('paypal_subscription', 'PaypalController@postPaymentWithpaypal')->name('paypal_subscription');
       Route::get('paypal_subscription', 'PaypalController@getPaymentStatus')->name('getPaymentStatus');
+      Route::post('paypal-subscription', 'PaypalController@AjaxgetPaymentStatus')->name('AjaxgetPaymentStatus');
       Route::post('Kingspay_subscription', 'Kingspaypayment@kingspaypayment')->name('Kingspay_subscription');
       Route::get('Kingspaypayment/getPaymentStatus', 'Kingspaypayment@getPaymentStatus');
       Route::get('paypal_subscription_failed', 'PaypalController@getPaymentFailed')->name('getPaymentFailed');

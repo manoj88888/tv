@@ -21,6 +21,7 @@ class CouponController extends Controller
     public function index()
     {
         $coupons = CouponCode::all();
+        $planData = [];
         return view('admin.coupon.index', compact('coupons','planData'));
     }
 

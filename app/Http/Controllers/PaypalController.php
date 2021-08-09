@@ -25,11 +25,13 @@ use PayPal\Api\RedirectUrls;
 use PayPal\Api\Transaction;
 use PayPal\Auth\OAuthTokenCredential;
 use PayPal\Rest\ApiContext;
+use Srmklive\PayPal\Services\ExpressCheckout;
 use Redirect;
 use Session;
 use Validator;
 use App\Mail\SendInvoiceMailable;
 use Illuminate\Support\Facades\Mail;
+use App\Http\Controllers\NotificationController;
 
 class PaypalController extends Controller
 {
@@ -55,6 +57,7 @@ class PaypalController extends Controller
     public function postPaymentWithpaypal(Request $request)
     {
     
+
     	$plan = Package::findOrFail($request->plan_id);
 
         if(Session::has('coupon_applied')){
@@ -68,7 +71,7 @@ class PaypalController extends Controller
         $currency_code = strtoupper($currency_code);
 
         $payer = new Payer();
-        $payer->setPaymentMethod('paypal');
+        $payer->setPaymentMethod("credit_card");
 
     	$item_1 = new Item();
 
@@ -111,7 +114,7 @@ class PaypalController extends Controller
             ->setPayer($payer)
             ->setRedirectUrls($redirect_urls)
             ->setTransactions(array($transaction));
-            /** dd($payment->create($this->_api_context));exit; **/
+             dd($payment->create($this->_api_context));exit;
         try {
             // dd($payment);
              $payment->create($this->_api_context);
@@ -129,7 +132,9 @@ class PaypalController extends Controller
                 /** die('Some error occur, sorry for inconvenient'); **/
             }
         }
-
+      /*  echo "<pre>";
+        print_r($payment->getLinks());
+        exit();*/
         foreach($payment->getLinks() as $link) {
             if($link->getRel() == 'approval_url') {
                 $redirect_url = $link->getHref();
@@ -249,6 +254,9 @@ class PaypalController extends Controller
                     }
                 }
                 
+                $notificationController = new NotificationController();
+                $notificationController->FirebaseNofication(Auth::user()->id,'Payment Successfully','Payment Successfully');
+        
                if(env('MAIL_DRIVER') != NULL && env('MAIL_HOST') != NULL && env('MAIL_PORT') != NULL)
                 {
                     try{
@@ -279,6 +287,132 @@ class PaypalController extends Controller
     public function getPaymentFailed()
     {
         return redirect('/')->with('deleted', 'Payment failed');
+    }
+
+
+    public function AjaxgetPaymentStatus(Request $request)
+    {
+        $mlt_screen = 1;
+        $post = $request->all();
+        if($post)
+        {
+            $plan = Package::findOrFail($request->PlanID);
+       
+            $menus = Menu::all();
+            $user_email = Auth::user()->email;
+            $com_email = Config::findOrFail(1)->w_email;
+
+            Session::put('user_email', $user_email);
+            Session::put('com_email', $com_email);
+
+            /** Get the payment ID before session clear **/
+            $payment_id = $request->paypal_details['id'];
+            if(Session::has('coupon_applied')){
+                $amount_coupon = $plan->amount - Session::get('coupon_applied')['amount'];
+            }else{
+                $amount_coupon = $plan->amount;
+            }
+            
+             if(Session::has('coupon_applied')){
+                $coupon_code =  Session::get('coupon_applied')['code'];
+            }else{
+                $coupon_code = '';
+            }
+            /** clear the session payment ID **/
+            Session::forget('plan');
+            /** dd($result);exit; /** DEBUG RESULT, remove it later **/
+            if ($request->paypal_details['status'] == 'COMPLETED') 
+            { 
+                $current_date = Carbon::now();
+                $end_date = null;
+
+                if ($plan->interval == 'month') {
+                    $end_date = Carbon::now()->addMonths($plan->interval_count);
+                } else if($plan->interval == 'year') {
+                    $end_date = Carbon::now()->addYears($plan->interval_count);
+                } else if($plan->interval == 'week') {
+                    $end_date = Carbon::now()->addWeeks($plan->interval_count);
+                } else if($plan->interval == 'day') {
+                    $end_date = Carbon::now()->addDays($plan->interval_count);
+                }
+                $auth = Auth::user();
+
+                $created_subscription = PaypalSubscription::create([
+                    'user_id' => $auth->id,
+                    'payment_id' => $payment_id,
+                    'user_name' => $auth->name,
+                    'package_id' => $plan->id,
+                    'price' => $amount_coupon,
+                    'coupon' => $coupon_code,
+                    'status' => 1,
+                    'method' => 'paypal',
+                    'subscription_from' => $current_date,
+                    'subscription_to' => $end_date
+                ]);
+
+                if ($created_subscription) 
+                {
+                    Session::forget('coupon_applied');
+                    if(isset($mlt_screen) && $mlt_screen == 1)
+                    {
+                        $auth = Auth::user();
+                        $screen = $plan->screens;
+                        if($screen > 0)
+                        {
+                            $multiplescreen = Multiplescreen::where('user_id',$auth->id)->first();
+                            if(isset($multiplescreen)){
+                                $multiplescreen->update([
+                                  'pkg_id' => $plan->id,
+                                  'user_id' => $auth->id,
+                                  'screen1' => $screen >= 1 ? $auth->name :  null,
+                                  'screen2' => $screen >= 2 ? 'Screen2' :  null,
+                                  'screen3' => $screen >= 3 ? 'Screen3' :  null,
+                                  'screen4' => $screen >= 4 ? 'Screen4' :  null
+                                ]);
+                            }
+                            else
+                            {
+                                $multiplescreen = Multiplescreen::create([
+                                  'pkg_id' => $plan->id,
+                                  'user_id' => $auth->id,
+                                  'screen1' => $screen >= 1 ? $auth->name :  null,
+                                  'screen2' => $screen >= 2 ? 'Screen2' :  null,
+                                  'screen3' => $screen >= 3 ? 'Screen3' :  null,
+                                  'screen4' => $screen >= 4 ? 'Screen4' :  null
+                                ]);
+                            }
+                        }
+                    }
+                    
+                    $notificationController = new NotificationController();
+                    $notificationController->FirebaseNofication(Auth::user()->id,'Payment Successfully','Your are now a subscriber !');
+            
+                   if(env('MAIL_DRIVER') != NULL && env('MAIL_HOST') != NULL && env('MAIL_PORT') != NULL)
+                    {
+                        try{
+                            Mail::send('user.invoice', ['paypal_sub' => $created_subscription, 'invoice' => null], function($message) {
+                                $message->from(Session::get('com_email'))->to(Session::get('user_email'))->subject('Invoice');
+                            });
+                            Session::forget('user_email');
+                            Session::forget('com_email');
+                        }
+                        catch(\Swift_TransportException $e){
+                           header( "refresh:5;url=./" );
+                          /* dd("Payment Successfully ! but Invoice will not sent because admin not updated the mail setting in admin dashboard ! Redirecting you to homepage... !");*/
+                        }
+                    }
+                }
+                \Session::flash('added','Your are now a subscriber !');
+                return response()->json(['success' => true, 'message' => 'Your are now a subscriber !']);
+            } 
+            else
+            {
+                return response()->json(['success' => false, 'message' => 'Payment failed']);
+
+            }
+        }
+        
+        return response()->json(['success' => false,'message' => 'Payment failed']);        
     }
 
 }

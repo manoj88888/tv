@@ -558,7 +558,7 @@ public function MovieByCategory($id){
   }
 
   public function verify_coupon(Request $request){
-    $coupon = CouponCode::where('coupon_code',$request->coupon_code);
+    $coupon = CouponCode::where('coupon_code',$request->coupon_code)->first();
     if(isset($coupon) && $coupon != NULL){
       $current_date = Carbon::now();
       if($current_date < $coupon->redeem_by){
